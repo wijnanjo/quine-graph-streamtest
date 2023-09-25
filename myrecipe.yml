@@ -1,0 +1,211 @@
+version: 1
+title: collections
+contributor: Jo
+summary: poc
+description: |-
+  poc
+ingestStreams: []
+# - type: FileIngest
+#   path: data/simple_ordered.jsonl
+#   parallelism: 10
+#   format:
+#     type: CypherJson
+#     query: |-
+#       WITH $that AS item 
+#       WHERE item.simple_type = 'c'
+#       MATCH (col), (parent)
+#       WHERE id(col) = idFrom('path', item.path)
+#       AND id(parent) = idFrom('path', item.parent_path)
+
+#       WITH *, CASE WHEN item.path = '/' THEN true ELSE false END AS isRoot
+#       SET        
+#         col.objectid = item.id,
+#         col.path = item.path,
+#         col.isRoot = isRoot,
+#         col.descendsFromRoot = isRoot,
+#         col.ts = item.ts,
+#         col:collection
+      
+#       WITH * WHERE NOT isRoot
+#       SET 
+#         parent.path = item.parent_path,
+#         parent:collection
+#       CREATE (col)-[:has_parent]->(parent)
+      
+standingQueries:
+- pattern:
+    type: Cypher
+    mode: DistinctId    
+    query: |-
+      MATCH (c:collection)-[:has_parent]->(p:collection) WHERE p.descendsFromRoot = true
+      return DISTINCT strId(c) as colId
+  outputs:
+    # it's tempting to create a Attached and Detached output but doing so will create race conditions (so it seems)
+    collectionAttachedDetached:
+      type: CypherQuery
+      query: |-
+        WITH $that.data.colId AS id, $that.meta.isPositiveMatch AS descends
+        MATCH (c:collection) WHERE id(c) = id
+        // in case of cancellation, below will silently fail unless prefixed with OPTIONAL
+        OPTIONAL MATCH (c)-[:has_parent*]->(p:collection)
+        // sometimes we receive only a partial node (label missing, some props missing). And also never touch root
+        WITH * WHERE c IS NOT NULL AND head(labels(c)) = 'collection' AND exists(c.isRoot) AND NOT c.isRoot
+        SET c.descendsFromRoot = descends
+        RETURN c.objectid, c.path, collect(p.objectid) as ancestorIds, collect(p.path) as ancestorPaths
+      andThen:
+        type: PrintToStandardOut
+  includeCancellations: true
+
+- pattern:
+    type: Cypher
+    mode: MultipleValues
+    query: |-
+      MATCH (c1:collection)-[:has_parent]->(p:collection)<-[:has_parent]-(c2:collection) WHERE c1.path <> c2.path AND c1.objectid = c2.objectid 
+      RETURN id(p) as colId
+  outputs:
+    removeParentRel:
+      type: CypherQuery
+      query: |-
+        WITH $that.data.colId as id 
+
+        MATCH (c:collection)-[:has_parent]->(p:collection) WHERE id(p) = id
+        WITH id, c.objectid AS objectid, COUNT(*) AS cnt WHERE cnt > 1
+        WITH id, collect(objectid) AS ids
+
+        MATCH (c)-[:has_parent]->(p) WHERE id(p) = id AND c.objectid IN ids
+        
+        WITH c.objectid AS objectid, c.path AS path, id(c) AS id ORDER BY c.objectid, c.ts DESC
+        WITH objectid, tail(collect(path)) AS obsoletePaths
+
+        UNWIND obsoletePaths as p
+        MATCH (c:collection)-[r:has_parent]->() WHERE id(c) = idFrom('path', p)
+        DELETE r
+
+        RETURN DISTINCT objectid, obsoletePaths
+      andThen:
+        type: PrintToStandardOut
+
+nodeAppearances:
+- predicate:
+    propertyKeys:
+    - isRoot
+    - objectid
+    knownValues: { isRoot: true}
+    dbLabel: collection
+  icon: ion-ios-nutrition
+  color: '#00ff00'
+  size: 60.00
+  label:
+    type: Constant
+    value: 'Root'
+- predicate:
+    propertyKeys:
+    - objectid
+    - descendsFromRoot
+    knownValues: { descendsFromRoot: true}
+    dbLabel: collection
+  icon: ion-android-folder
+  color: '#00ff00'
+  size: 32.00
+  label:
+    type: Property
+    key: 'path'
+    prefix: ''
+- predicate:
+    propertyKeys:
+    - objectid
+    knownValues: { }
+    dbLabel: collection
+  icon: ion-android-folder
+  color: '#ff0000'
+  size: 32.00
+  label:
+    type: Property
+    key: 'path'
+    prefix: ''
+- predicate:
+    propertyKeys: []
+    knownValues: { }
+    dbLabel: collection
+  icon: ion-android-folder-open
+  color: '#ff0000'
+  size: 32.00
+  label:
+    type: Property
+    key: 'path'
+    prefix: ''
+
+quickQueries:
+- predicate:
+    propertyKeys: []
+    knownValues: {}
+  quickQuery:
+    name: Adjacent Nodes
+    querySuffix: MATCH (n)--(m) RETURN DISTINCT m
+    queryLanguage: Cypher
+    sort: Node
+- predicate:
+    propertyKeys: []
+    knownValues: {}
+  quickQuery:
+    name: Refresh
+    querySuffix: RETURN n
+    queryLanguage: Cypher
+    sort: Node
+- predicate:
+    propertyKeys: []
+    knownValues: {}
+  quickQuery:
+    name: Local Properties
+    querySuffix: RETURN id(n), properties(n)
+    queryLanguage: Cypher
+    sort: Text
+- predicate:
+    propertyKeys: []
+    knownValues: {}
+    dbLabel: collection
+  quickQuery:
+    name: Ancestors
+    querySuffix: MATCH (n)-[:has_parent*]->(c) RETURN LIMIT 50
+    queryLanguage: Cypher
+    sort: Node
+- predicate:
+    propertyKeys: []
+    knownValues: {}
+    dbLabel: collection
+  quickQuery:
+    name: Descendants
+    querySuffix: MATCH (n)<-[:has_parent*]-(c) RETURN c LIMIT 50
+    queryLanguage: Cypher
+    sort: Node
+- predicate:
+    propertyKeys: []
+    knownValues: {}
+    dbLabel: collection
+  quickQuery:
+    name: Parent
+    querySuffix: MATCH (n)-[:has_parent]->(c) RETURN c LIMIT 50
+    queryLanguage: Cypher
+    sort: Node
+- predicate:
+    propertyKeys: []
+    knownValues: {}
+    dbLabel: collection
+  quickQuery:
+    name: Children
+    querySuffix: MATCH (n)<-[:has_parent]-(c) RETURN c LIMIT 50
+    queryLanguage: Cypher
+    sort: Node
+sampleQueries:
+- name: Last 10 Nodes
+  query: CALL recentNodes(10)
+- name: Legend
+  query: MATCH (n) WHERE labels(n) IS NOT NULL WITH labels(n) AS kind, collect(n) AS legend RETURN legend[0]
+- name: Collections
+  query: MATCH (n:collection) RETURN n LIMIT 20
+- name: Root
+  query: MATCH (r:collection) WHERE r.isRoot = true RETURN r
+- name: Dangling
+  query: MATCH (c:collection) WHERE NOT exists(c.descendsFromRoot) OR c.descendsFromRoot = false RETURN c
+
+statusQuery: null

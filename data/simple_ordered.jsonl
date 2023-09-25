@@ -1,0 +1,7 @@
+{"id": "id-root", "path":"/","parent_path":"/","simple_type":"c", "ts": 1}
+{"id": "id-A", "path":"/A","parent_path":"/","simple_type":"c", "ts": 2}
+{"id": "id-B", "path":"/B","parent_path":"/","simple_type":"c", "ts": 3}
+{"id": "id-C", "path":"/A/C","parent_path":"/A","simple_type":"c", "ts": 4}
+{"id": "id-D", "path":"/A/D","parent_path":"/A","simple_type":"c", "ts": 5}
+{"id": "id-E", "path":"/A/C/E","parent_path":"/A/C","simple_type":"c", "ts": 6}
+{"id": "id-F", "path":"/A/C/F","parent_path":"/A/C","simple_type":"c", "ts": 7}

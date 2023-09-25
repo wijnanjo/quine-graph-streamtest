@@ -1,0 +1,11 @@
+{
+    "format": {
+      "query": "WITH $that AS item WHERE item.simple_type = 'c' MATCH (col), (parent) WHERE id(col) = idFrom('path', item.path) AND id(parent) = idFrom('path', item.parent_path) WITH *, CASE WHEN item.path = '/' THEN true ELSE false END AS isRoot SET col.objectid = item.id,col.path = item.path,col.isRoot = isRoot,col.descendsFromRoot = isRoot,col.ts = item.ts,col:collection WITH * WHERE NOT isRoot SET parent.path = item.parent_path,parent:collection CREATE (col)-[:has_parent]->(parent)",
+      "parameter": "that",
+      "type": "CypherJson"
+    },
+    "type": "FileIngest",
+    "path": "data/renamed_ordered.jsonl",
+    "parallelism": 10
+  }
+  
